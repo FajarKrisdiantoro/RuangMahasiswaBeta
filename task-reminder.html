@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Reminder</title>
+    <link rel="stylesheet" href="task.css">
+</head>
+<body>
+    <div class="container">
+        <h2>Upload & Download File</h2>
+
+        <form id="uploadForm">
+            <label for="fileTitle">Judul File:</label>
+            <input type="text" id="fileTitle" name="fileTitle" placeholder="Masukkan judul file" required>
+
+            <label for="fileUpload">Unggah File:</label>
+            <input type="file" id="fileUpload" name="fileUpload" required>
+
+            <label for="deadline">Tanggal Deadline:</label>
+            <input type="date" id="deadline" name="deadline" required><br>
+            <br>
+            <button type="submit">Unggah</button>
+        </form>
+
+        <div id="editFormContainer" style="display: none;">
+            <h3>Edit File</h3>
+            <form id="editForm">
+                <label for="editFileTitle">Judul File:</label>
+                <input type="text" id="editFileTitle" name="editFileTitle" required>
+
+                <label for="editFileUpload">Unggah File Baru:</label>
+                <input type="file" id="editFileUpload" name="editFileUpload">
+
+                <label for="editDeadline">Tanggal Deadline:</label>
+                <input type="date" id="editDeadline" name="editDeadline" required><br>
+                <br>
+                <button type="submit">Simpan Perubahan</button>
+                <button type="button" id="cancelEdit">Batal</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <h3>File Tersedia untuk Diunduh:</h3>
+        <ul id="fileList"></ul>
+    </div>
+
+    <script>
+        const uploadForm = document.getElementById('uploadForm');
+        const fileList = document.getElementById('fileList');
+        const editFormContainer = document.getElementById('editFormContainer');
+        const editForm = document.getElementById('editForm');
+        let currentEditIndex = null;
+
+        // Fungsi untuk menampilkan file dari Local Storage
+        function displayFiles() {
+            const files = JSON.parse(localStorage.getItem('uploadedFiles')) || [];
+            fileList.innerHTML = ''; // Kosongkan daftar sebelum menambahkan
+            files.forEach((file, index) => {
+                const listItem = document.createElement('li');
+
+                // Teks judul file dan deadline
+                const fileInfo = document.createElement('span');
+                fileInfo.textContent = `${file.title} (Deadline: ${file.deadline})`;
+                fileInfo.style.marginRight = '10px';
+
+                // Tombol Download
+                const downloadButton = document.createElement('button');
+                downloadButton.textContent = 'Download';
+                downloadButton.onclick = () => {
+                    const a = document.createElement('a');
+                    a.href = file.url;
+                    a.download = file.name;
+                    a.click();
+                };
+
+                // Tombol Edit
+                const editButton = document.createElement('button');
+                editButton.textContent = 'Edit';
+                editButton.onclick = () => openEditForm(index);
+
+                // Tombol Hapus
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Hapus';
+                deleteButton.onclick = () => deleteFile(index);
+
+                listItem.appendChild(fileInfo);
+                listItem.appendChild(downloadButton);
+                listItem.appendChild(editButton);
+                listItem.appendChild(deleteButton);
+
+                fileList.appendChild(listItem);
+            });
+        }
+
+        // Fungsi untuk menangani pengunggahan file
+        uploadForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const fileInput = document.getElementById('fileUpload');
+            const fileDeadline = document.getElementById('deadline').value;
+            const fileTitle = document.getElementById('fileTitle').value;
+
+            const file = fileInput.files[0];
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function () {
+                    const uploadedFile = {
+                        title: fileTitle,
+                        url: reader.result, // Simpan file sebagai base64
+                        name: file.name,
+                        deadline: fileDeadline
+                    };
+
+                    // Simpan file ke Local Storage
+                    const files = JSON.parse(localStorage.getItem('uploadedFiles')) || [];
+                    files.push(uploadedFile);
+                    localStorage.setItem('uploadedFiles', JSON.stringify(files));
+
+                    // Reset form
+                    fileInput.value = '';
+                    document.getElementById('fileTitle').value = '';
+                    document.getElementById('deadline').value = '';
+
+                    // Tampilkan file yang di-upload
+                    displayFiles();
+                };
+                reader.readAsDataURL(file); // Konversi file ke Base64
+            } else {
+                alert('Silakan pilih file untuk diunggah.');
+            }
+        });
+
+        // Fungsi untuk membuka form edit
+        function openEditForm(index) {
+            const files = JSON.parse(localStorage.getItem('uploadedFiles')) || [];
+            const fileToEdit = files[index];
+
+            currentEditIndex = index; // Simpan indeks file yang sedang diedit
+
+            document.getElementById('editFileTitle').value = fileToEdit.title;
+            document.getElementById('editDeadline').value = fileToEdit.deadline;
+            document.getElementById('editFileUpload').value = '';
+
+            editFormContainer.style.display = 'block';
+        }
+
+        // Fungsi untuk menyimpan perubahan setelah edit
+        editForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            const files = JSON.parse(localStorage.getItem('uploadedFiles')) || [];
+            const fileToEdit = files[currentEditIndex];
+
+            const newTitle = document.getElementById('editFileTitle').value;
+            const newDeadline = document.getElementById('editDeadline').value;
+            const newFile = document.getElementById('editFileUpload').files[0];
+
+            if (newFile) {
+                const reader = new FileReader();
+                reader.onload = function () {
+                    fileToEdit.url = reader.result;
+                    fileToEdit.name = newFile.name;
+                    saveEditedFile(files, fileToEdit, newTitle, newDeadline);
+                };
+                reader.readAsDataURL(newFile);
+            } else {
+                saveEditedFile(files, fileToEdit, newTitle, newDeadline);
+            }
+        });
+
+        // Fungsi untuk menyimpan file setelah diedit
+        function saveEditedFile(files, fileToEdit, newTitle, newDeadline) {
+            fileToEdit.title = newTitle;
+            fileToEdit.deadline = newDeadline;
+
+            localStorage.setItem('uploadedFiles', JSON.stringify(files));
+            editFormContainer.style.display = 'none';
+            displayFiles();
+        }
+
+        // Fungsi untuk membatalkan edit
+        document.getElementById('cancelEdit').addEventListener('click', () => {
+            editFormContainer.style.display = 'none';
+        });
+
+        // Fungsi untuk menghapus file
+        function deleteFile(index) {
+            const files = JSON.parse(localStorage.getItem('uploadedFiles')) || [];
+            files.splice(index, 1);
+            localStorage.setItem('uploadedFiles', JSON.stringify(files));
+            displayFiles();
+        }
+
+        // Tampilkan file saat halaman dimuat
+        window.onload = displayFiles;
+    </script>
+
+    <footer>
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="task-reminder.html">Task Reminder</a></li>
+                <li><a href="setting.html">Setting</a></li>
+            </ul>
+        </nav>
+        <p>&copy; 2024 Ruang Mahasiswa</p>
+    </footer>
+</body>
+</html>
